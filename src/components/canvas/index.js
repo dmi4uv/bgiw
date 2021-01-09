@@ -4,82 +4,78 @@ import {socket} from "../../utils/socket";
 
 
 export default function Canvas(props) {
-
+    const [box_size, setBox_size] = useState(30)
     const mapCanvasRef = useRef(null)
     const [gameMap,setGameMap] = useState(props.preloaded)
     const map_size = Math.sqrt(gameMap.length)
 
     let bez = gameMap
     //не работает при скролле
+
+
     const onRightClick = (e) => {
         e.preventDefault()
-        console.log("Map:SIZE", map_size)
         const x = e.clientX - e.target.offsetLeft
         const y = e.clientY - e.target.offsetTop
-        const itemIndex = ((Math.floor(x/32)))+Math.floor(y/32)*map_size
-        const newMap = gameMap
-        let i = 0
-        if(newMap[itemIndex]==0){
-            newMap[itemIndex] = 1
-            i=1
-        } else {
-            newMap[itemIndex] = 0
-            i = 0
-        }
-        socket.emit('right click',{
-            message: [itemIndex,i]
-        })
+        socket.emit('right click', [x,y])
     }
     const onLeftClick = (e) => {
-
         const x = e.clientX - e.target.offsetLeft
         const y = e.clientY - e.target.offsetTop
-        const itemIndex = ((Math.floor(x/32)))+Math.floor(y/32)*map_size
-        const newMap = gameMap
-        let i = 0
-        if(newMap[itemIndex]!==2){
-            newMap[itemIndex] = 2
-            i = 2
-        } else {
-            newMap[itemIndex] = 0
-            i = 0
-        }
-
-        socket.emit('left click',{
-            message: [itemIndex,i]
-        })
+        socket.emit('left click',[x,y])
     }
 
-    const giveMap = ()=> {
-       draw(bez)
+    let scale = 1
+
+    const giveMap = (e)=> {
+        console.log(e.deltaY)
+        console.log(scale)
+        if (e.deltaY<0){
+            scale += .01
+        } else {
+            scale -= .01
+        }
+            const mapCanvas = mapCanvasRef.current.getContext('2d')
+            // mapCanvas.clearRect(0, 0, mapCanvasRef.current.width, mapCanvasRef.current.height)
+        mapCanvas.scale(1,1)
+            mapCanvas.scale(scale,scale)
     }
 
     useEffect(()=>{
        setInterval(()=>{
            draw(bez)
-       },1000/25)
+       },1000/60)
 
     },[])
+
+    useEffect(()=>{
+
+        draw(bez)
+    },[setBox_size])
 
     function draw(map) {
         const mapCanvas = mapCanvasRef.current.getContext('2d')
         mapCanvas.imageSmoothingEnabled=false
+        mapCanvas.clearRect(0, 0, mapCanvasRef.current.width, mapCanvasRef.current.height)
         for (let i = 0; i<map_size; i++) {
             for (let k =0; k<map_size; k++){
-                switch (map[((k*map_size)+i)]) {
-                    case 0 :
+                switch (map[((k*map_size)+i)].type) {
+                    case undefined :
                         mapCanvas.fillStyle='#58b3f9'
                         break
-                    case 1:
+                    case "Ground" :
                         mapCanvas.fillStyle='#7d5a2e'
                         break
-                    case 2:
-                        mapCanvas.fillStyle='#e366a2'
+                    case "Pink" :
+                        mapCanvas.fillStyle='#df97e5'
+                        break
+                    case "Player":
+                        mapCanvas.fillStyle='#ef41ff'
                         break
                     default:
                         return
                 }
-                mapCanvas.fillRect(i*32,k*32,30,30)
+                mapCanvas.fillRect(i*box_size,k*box_size,box_size-1,box_size-1)
             }
         }
     }
@@ -89,14 +85,14 @@ export default function Canvas(props) {
     })
 
     return (<div id="game">
-        <button onClick={giveMap}>hey</button>
-        <canvas onContextMenu={onRightClick}
+        <button >hey</button>
+        <canvas onWheel={giveMap} onContextMenu={onRightClick}
     onClick={onLeftClick}
     id="mapCanvas"
     className="canvas"
     ref={mapCanvasRef}
-    height="600px"
-    width="900px" />
+    height="700px"
+    width="1200px" />
     </div>
 
     )

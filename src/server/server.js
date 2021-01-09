@@ -4,20 +4,23 @@ const socketIo = require('socket.io')
 const db = "mongodb://localhost/game";
 const mongoose = require('mongoose')
 const PORT = 2070
-
-let gameMap = [
-    0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,
-    0,0,1,2,1,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0,
-    0,0,0,0,0,0,0,0,0,0
-]
-
+const mapGenerator = require( "./mapGenerator")
+let playerName = 'default'
+const cfg = require('./mapConfig')
+console.log(mapGenerator())
+let playerPos = 42
+let gameMap = mapGenerator()
+let playerGround = 0
+const playerColor = "Pink"
+gameMap[42] = {
+    type: "Player"
+}
+gameMap[43] = {
+    type: "Ground"
+}
+gameMap[41] = {
+    type: "Ground"
+}
 
 mongoose.connect(db, {useNewUrlParser: true,
             useUnifiedTopology: true
@@ -47,18 +50,98 @@ io.on('connection',(socket)=>{
         io.emit('online',onlineMembers)
     })
 
-    socket.on('left click',msg => {
-        const temp = gameMap
-        temp[msg.message[0]] = msg.message[1]
-        gameMap = temp
-        console.log("Left click event")
-        mapUpdate()
+    socket.on('playerName',payload =>{
+        playerName = payload
     })
 
-    socket.on('right click',msg => {
+    socket.on('left click', payload => {
+        const itemIndex = ((Math.floor(payload[0]/30)))+Math.floor(payload[1]/30)*cfg.map_size
         const temp = gameMap
-        temp[msg.message[0]] = msg.message[1]
-        gameMap = temp
+
+
+        if(
+            (
+                (itemIndex==playerPos+1)||
+                (itemIndex==playerPos-1)||
+                (itemIndex+cfg.map_size==playerPos)||
+                (itemIndex-cfg.map_size==playerPos)
+            )
+            &&
+            (temp[itemIndex].type=="Ground")
+        ){
+
+            temp[itemIndex].type = "Player"
+            temp[playerPos].type = "Ground"
+            playerPos = itemIndex
+        } else if(
+            (
+                (itemIndex==playerPos+1)||
+                (itemIndex==playerPos-1)||
+                (itemIndex+cfg.map_size==playerPos)||
+                (itemIndex-cfg.map_size==playerPos)
+            )
+            &&
+            (temp[itemIndex].type==playerColor)
+        ){
+
+            temp[itemIndex].type = "Player"
+            temp[playerPos].type = playerColor
+            playerPos = itemIndex
+        } else return
+
+
+        //     if(temp[itemIndex].type!=="Player"){
+        //     temp[itemIndex].type = "Player"
+        // } else {
+        //     temp[itemIndex].type = "Sea"
+        // }
+
+
+        mapUpdate()
+        console.log("Left click event")
+    })
+
+    socket.on('right click',payload => {
+        const itemIndex = ((Math.floor(payload[0]/30)))+Math.floor(payload[1]/30)*cfg.map_size
+        const temp = gameMap
+
+        if(
+            (
+                (itemIndex==playerPos+1)||
+                (itemIndex==playerPos-1)||
+                (itemIndex+cfg.map_size==playerPos)||
+                (itemIndex+cfg.map_size+1==playerPos)||
+                (itemIndex-cfg.map_size-1==playerPos)||
+                (itemIndex-cfg.map_size==playerPos)
+            )
+            &&
+            (temp[itemIndex].type=="Ground"||temp[itemIndex].type==playerColor)
+        ){
+            temp[itemIndex] = 0
+            playerGround++
+        } else if ((playerGround)&&(
+            (itemIndex==playerPos+1)||
+            (itemIndex==playerPos-1)||
+            (itemIndex+cfg.map_size==playerPos)||
+            (itemIndex-cfg.map_size==playerPos)
+        ))
+        {
+            temp[itemIndex] = {
+                owner: playerName,
+                type: playerColor
+            }
+            playerGround--
+        }
+
+        // if(temp[itemIndex].type!=="Ground"){
+        //     temp[itemIndex] = {
+        //         type:"Ground",
+        //         owner: playerName
+        //     }
+        // } else {
+        //     temp[itemIndex] = 0
+        // }
+
         console.log("Right click event")
         mapUpdate()
     })
